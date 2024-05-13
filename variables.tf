@@ -28,3 +28,9 @@ variable "checkov_skip" {
   type        = list(string)
   default     = [""]
 }
+
+variable "kms_key_arn" {
+  default     = null
+  description = "Customer Managed Key (CMK) ARN used for the provided CodeCommit repository. This will update the IAM role to have the correct permissions. The CMK will need to be updated separately."
+  type        = string
+}

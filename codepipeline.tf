@@ -36,17 +36,17 @@ resource "aws_codepipeline" "this" {
       for_each = local.validation_stages
       content {
         name            = action.key
-      category        = "Test"
-      owner           = "AWS"
-      provider        = "CodeBuild"
-      input_artifacts = ["source_output"]
-      version         = "1"
+        category        = "Test"
+        owner           = "AWS"
+        provider        = "CodeBuild"
+        input_artifacts = ["source_output"]
+        version         = "1"
 
-       configuration = {
+        configuration = {
           ProjectName = module.validation[action.key].codebuild_project.name
         }
       }
-      
+
     }
 
   }
@@ -124,6 +124,18 @@ resource "aws_iam_role_policy_attachment" "codepipeline" {
   policy_arn = aws_iam_policy.codepipeline.arn
 }
 
+resource "aws_iam_role_policy_attachment" "cmk" {
+  count      = var.kms_key_arn != null ? 1 : 0
+  role       = aws_iam_role.codepipeline_role.name
+  policy_arn = aws_iam_policy.cmk[0].arn
+}
+
+resource "aws_iam_policy" "cmk" {
+  count  = var.kms_key_arn != null ? 1 : 0
+  name   = "${var.pipeline_name}-cmk-role"
+  policy = data.aws_iam_policy_document.cmk-policy[0].json
+}
+
 resource "aws_iam_policy" "codepipeline" {
   name   = "${var.pipeline_name}-role"
   policy = data.aws_iam_policy_document.codepipeline-policy.json
@@ -152,7 +164,7 @@ data "aws_iam_policy_document" "codepipeline-policy" {
       "codecommit:GetBranch",
       "codecommit:GetCommit",
       "codecommit:UploadArchive",
-      "codecommit:GetUploadArchiveStatus",      
+      "codecommit:GetUploadArchiveStatus",
       "codecommit:CancelUploadArchive"
     ]
 
@@ -170,6 +182,26 @@ data "aws_iam_policy_document" "codepipeline-policy" {
 
     resources = [
       "arn:aws:codebuild:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:project/${var.pipeline_name}-*"
+    ]
+  }
+
+}
+
+
+data "aws_iam_policy_document" "cmk-policy" {
+  count = var.kms_key_arn != null ? 1 : 0
+  statement {
+    effect = "Allow"
+    actions = [
+      "kms:DescribeKey",
+      "kms:GenerateDataKey*",
+      "kms:Encrypt",
+      "kms:ReEncrypt*",
+      "kms:Decrypt"
+    ]
+
+    resources = [
+      "${var.kms_key_arn}"
     ]
   }
 
